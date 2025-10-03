@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MSK Intake — Internal Mock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-b from-white to-gray-50 min-h-screen">
+  <div id="root"></div>
+
+  <!-- React 18 UMD + ReactDOM UMD -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel for in-browser JSX (dev/demo only) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    function StepPill({ index, active, done, label }) {
+      return (
+        <div className={
+          ["flex items-center gap-2 px-3 py-1 rounded-full text-sm",
+           active ? "bg-black text-white" : (done ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-600")
+          ].join(" ")
+        }>
+          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/20 border border-white/30">
+            {done ? "✓" : index}
+          </span>
+          <span>{label}</span>
+        </div>
+      );
+    }
+
+    function Toggle({ checked, onChange, label }) {
+      return (
+        <label className="flex items-center gap-3 py-1">
+          <input type="checkbox" className="h-4 w-4" checked={checked} onChange={(e)=>onChange(e.target.checked)} />
+          <span className="text-sm">{label}</span>
+        </label>
+      );
+    }
+
+    function SectionHeader({ title, subtitle }) {
+      return (
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold">{title}</h3>
+          {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
+        </div>
+      );
+    }
+
+    function App() {
+      const steps = ["Consent", "Complaint", "Pain & Irritability", "Flags", "Function", "History", "Goals", "Review"];
+      const [step, setStep] = useState(0);
+      const [consented, setConsented] = useState(false);
+      const [data, setData] = useState({
+        patientName: "",
+        dob: "",
+        bodyArea: "",
+        chiefComplaint: "",
+        onsetType: "",
+        onsetDate: "",
+        mechanism: "",
+        painCurrent: 5,
+        painBest: 2,
+        painWorst: 8,
+        irritOn: 5,
+        irritOff: 30,
+        sleepImpact: false,
+        aggravators: "",
+        easers: "",
+        workStatus: "",
+        psfs1: "Tie shoes", psfs1Score: 4,
+        psfs2: "Carry shopping", psfs2Score: 3,
+        psfs3: "Sleep through night", psfs3Score: 5,
+        prevEpisodes: false,
+        surgeries: "",
+        medications: "",
+        imaging: "",
+        comorbidities: "",
+        rf_saddle: false,
+        rf_bladder: false,
+        rf_bowel: false,
+        rf_progressiveWeak: false,
+        rf_recentTrauma: false,
+        rf_unableWB: false,
+        rf_cancerHx: false,
+        rf_unexplainedWLorNightPain: false,
+        goals: "",
+        prefs: [],
+      });
+
+      const criticalRedFlag = useMemo(() => {
+        const ce = data.rf_saddle || data.rf_bladder || data.rf_bowel;
+        const prog = data.rf_progressiveWeak;
+        const traumaWB = data.rf_recentTrauma && data.rf_unableWB && ["hip","knee","ankle_foot"].includes(data.bodyArea);
+        return ce || prog || traumaWB;
+      }, [data]);
+
+      const priorityFlag = useMemo(() => {
+        const cancerCombo = data.rf_cancerHx && data.rf_unexplainedWLorNightPain;
+        const highIrrit = data.painWorst >= 8 && data.irritOn <= 5 && data.irritOff >= 30;
+        return cancerCombo || highIrrit;
+      }, [data]);
+
+      const triage = criticalRedFlag ? "escalate" : (priorityFlag ? "priority" : "routine");
+
+      const summary = useMemo(() => {
+        const lines = [];
+        const first = `${data.patientName || "Patient"} with ${data.onsetType || ""} onset ${data.bodyArea || "issue"}.`;
+        lines.push(first.trim());
+        lines.push(`Onset: ${data.onsetType || "?"}, date ${data.onsetDate || "?"}, mechanism: ${data.mechanism || "?"}.`);
+        lines.push(`Irritability: provokes in ${data.irritOn}m, eases in ${data.irritOff}m. Sleep impact: ${data.sleepImpact ? "yes" : "no"}.`);
+        lines.push(`Aggravators: ${data.aggravators || "n/a"}. Easers: ${data.easers || "n/a"}.`);
+        lines.push(`Function: work ${data.workStatus || "?"}. PSFS → ${data.psfs1} ${data.psfs1Score}/10; ${data.psfs2} ${data.psfs2Score}/10; ${data.psfs3} ${data.psfs3Score}/10.`);
+        lines.push(`History: prev episodes ${data.prevEpisodes ? "yes" : "no"}; surgeries ${data.surgeries || "-"}; meds ${data.medications || "-"}; imaging ${data.imaging || "-"}; comorbidity ${data.comorbidities || "-"}.`);
+        const rfList = [];
+        if (data.rf_saddle) rfList.push("saddle anaesthesia");
+        if (data.rf_bladder) rfList.push("bladder dysfunction");
+        if (data.rf_bowel) rfList.push("bowel incontinence");
+        if (data.rf_progressiveWeak) rfList.push("progressive weakness");
+        if (data.rf_recentTrauma) rfList.push("recent trauma");
+        if (data.rf_unableWB) rfList.push("unable to weight-bear");
+        if (data.rf_cancerHx) rfList.push("cancer history");
+        if (data.rf_unexplainedWLorNightPain) rfList.push("unexplained weight loss / night pain");
+        lines.push(`Red flags: ${rfList.length ? rfList.join(", ") : "none reported"}.`);
+        lines.push(`Goals: ${data.goals || "-"}.`);
+        lines.push(`PROMs: NRS current ${data.painCurrent}/10 (best ${data.painBest}, worst ${data.painWorst}).`);
+        lines.push(`Triage: ${triage.toUpperCase()} — ${triage === "escalate" ? "critical red flag present" : triage === "priority" ? "high irritability or risk combo" : "no flags of concern"}.`);
+        return lines.join("\\n");
+      }, [data, triage]);
+
+      const canNext = step === 0 ? consented : true;
+
+      return (
+        <div className="py-8 px-4 flex items-center justify-center">
+          <div className="w-full max-w-2xl bg-white shadow-xl border border-gray-100 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-bold">MSK Intake (Mock)</h1>
+              <div className="hidden md:flex gap-2">
+                {["Consent","Complaint","Pain & Irritability","Flags","Function","History","Goals","Review"].map((label, i) =>
+                  <StepPill key={i} index={i+1} active={i===step} done={i<step} label={label} />
+                )}
+              </div>
+            </div>
+
+            {/* Step content */}
+            {step === 0 && (
+              <div>
+                <SectionHeader title="Consent & Details" subtitle="This mock runs fully in your browser — no data is stored."/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Patient name</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.patientName} onChange={(e)=>setData({...data, patientName: e.target.value})} placeholder="Alex Morgan"/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Date of birth</label>
+                    <input type="date" className="w-full border rounded-xl px-3 py-2" value={data.dob} onChange={(e)=>setData({...data, dob: e.target.value})}/>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Toggle checked={consented} onChange={setConsented} label="I agree to share this information with my clinician. I understand this is not medical advice."/>
+                </div>
+              </div>
+            )}
+
+            {step === 1 && (
+              <div>
+                <SectionHeader title="Chief complaint" subtitle="Tell us what's going on"/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Body area</label>
+                    <select className="w-full border rounded-xl px-3 py-2" value={data.bodyArea} onChange={(e)=>setData({...data, bodyArea: e.target.value})}>
+                      <option value="">Select area</option>
+                      {["neck","thoracic","low_back","shoulder","elbow","wrist_hand","hip","knee","ankle_foot","other"].map(x => <option key={x} value={x}>{x.replace("_"," ")}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Onset</label>
+                    <select className="w-full border rounded-xl px-3 py-2" value={data.onsetType} onChange={(e)=>setData({...data, onsetType: e.target.value})}>
+                      <option value="">Select</option>
+                      <option value="sudden">sudden</option>
+                      <option value="gradual">gradual</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Onset date</label>
+                    <input type="date" className="w-full border rounded-xl px-3 py-2" value={data.onsetDate} onChange={(e)=>setData({...data, onsetDate: e.target.value})}/>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1">Mechanism / context</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.mechanism} onChange={(e)=>setData({...data, mechanism: e.target.value})} placeholder="e.g., increased sitting; awkward lift; no clear cause"/>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium mb-1">In your own words</label>
+                  <textarea rows="3" className="w-full border rounded-xl px-3 py-2" value={data.chiefComplaint} onChange={(e)=>setData({...data, chiefComplaint: e.target.value})} placeholder="Describe your symptoms and what brought them on"/>
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div>
+                <SectionHeader title="Pain & Irritability" subtitle="Your current pain and how easily it flares"/>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Current pain (0–10)</label>
+                    <input type="range" min="0" max="10" className="w-full" value={data.painCurrent} onChange={(e)=>setData({...data, painCurrent: Number(e.target.value)})}/>
+                    <div className="text-sm text-gray-600">{data.painCurrent}/10</div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Best (24h)</label>
+                    <input type="range" min="0" max="10" className="w-full" value={data.painBest} onChange={(e)=>setData({...data, painBest: Number(e.target.value)})}/>
+                    <div className="text-sm text-gray-600">{data.painBest}/10</div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Worst (24h)</label>
+                    <input type="range" min="0" max="10" className="w-full" value={data.painWorst} onChange={(e)=>setData({...data, painWorst: Number(e.target.value)})}/>
+                    <div className="text-sm text-gray-600">{data.painWorst}/10</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Minutes to provoke</label>
+                    <input type="number" className="w-full border rounded-xl px-3 py-2" value={data.irritOn} onChange={(e)=>setData({...data, irritOn: Number(e.target.value)})}/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Minutes to ease</label>
+                    <input type="number" className="w-full border rounded-xl px-3 py-2" value={data.irritOff} onChange={(e)=>setData({...data, irritOff: Number(e.target.value)})}/>
+                  </div>
+                  <div className="flex items-end">
+                    <Toggle checked={data.sleepImpact} onChange={(v)=>setData({...data, sleepImpact: v})} label="Sleep is disturbed by symptoms"/>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Aggravating factors</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.aggravators} onChange={(e)=>setData({...data, aggravators: e.target.value})} placeholder="bending, lifting, sitting..."/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Easing factors</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.easers} onChange={(e)=>setData({...data, easers: e.target.value})} placeholder="walking, heat, breaks..."/>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div>
+                <SectionHeader title="Safety check" subtitle="Please tick any that apply"/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {data.bodyArea === "low_back" && (
+                    <>
+                      <Toggle checked={data.rf_saddle} onChange={(v)=>setData({...data, rf_saddle: v})} label="New saddle numbness"/>
+                      <Toggle checked={data.rf_bladder} onChange={(v)=>setData({...data, rf_bladder: v})} label="Difficulty starting or controlling urination"/>
+                      <Toggle checked={data.rf_bowel} onChange={(v)=>setData({...data, rf_bowel: v})} label="Loss of bowel control"/>
+                    </>
+                  )}
+                  <Toggle checked={data.rf_progressiveWeak} onChange={(v)=>setData({...data, rf_progressiveWeak: v})} label="Progressive weakness in a limb"/>
+                  <Toggle checked={data.rf_recentTrauma} onChange={(v)=>setData({...data, rf_recentTrauma: v})} label="Recent significant trauma"/>
+                  <Toggle checked={data.rf_unableWB} onChange={(v)=>setData({...data, rf_unableWB: v})} label="Unable to fully weight-bear (hip/knee/ankle)"/>
+                  <Toggle checked={data.rf_cancerHx} onChange={(v)=>setData({...data, rf_cancerHx: v})} label="History of cancer"/>
+                  <Toggle checked={data.rf_unexplainedWLorNightPain} onChange={(v)=>setData({...data, rf_unexplainedWLorNightPain: v})} label="Unexplained weight loss or unrelenting night pain"/>
+                </div>
+                {criticalRedFlag && (
+                  <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-200 text-red-800">
+                    <div className="font-semibold">Potential urgent symptoms</div>
+                    <p className="text-sm mt-1">
+                      This form can’t give medical advice. If you have new saddle numbness, difficulty starting or controlling urination, or loss of bowel control,
+                      please seek urgent care (999/111 or A&E). We’ll alert the clinic.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === 4 && (
+              <div>
+                <SectionHeader title="Function & PSFS" subtitle="Work status and three important activities"/>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Work status</label>
+                    <select className="w-full border rounded-xl px-3 py-2" value={data.workStatus} onChange={(e)=>setData({...data, workStatus: e.target.value})}>
+                      <option value="">Select</option>
+                      <option value="full">full</option>
+                      <option value="modified">modified</option>
+                      <option value="off">off</option>
+                      <option value="na">n/a</option>
+                    </select>
+                  </div>
+                  {[1,2,3].map((n)=> (
+                    <div key={n} className="md:col-span-1">
+                      <label className="block text-sm font-medium mb-1">PSFS activity {n}</label>
+                      <input className="w-full border rounded-xl px-3 py-2" value={data["psfs"+n]} onChange={(e)=>setData({...data, ["psfs"+n]: e.target.value})} placeholder={n===1?"Tie shoes": n===2?"Carry shopping":"Sleep through night"}/>
+                      <label className="block text-xs mt-1">Score (0–10)</label>
+                      <input type="number" min="0" max="10" className="w-full border rounded-xl px-3 py-2" value={data["psfs"+n+"Score"]} onChange={(e)=>setData({...data, ["psfs"+n+"Score"]: Number(e.target.value)})} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {step === 5 && (
+              <div>
+                <SectionHeader title="History" subtitle="Relevant past issues, meds, imaging"/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Toggle checked={data.prevEpisodes} onChange={(v)=>setData({...data, prevEpisodes: v})} label="Previous similar episodes"/>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Surgeries (relevant)</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.surgeries} onChange={(e)=>setData({...data, surgeries: e.target.value})}/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Medications</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.medications} onChange={(e)=>setData({...data, medications: e.target.value})}/>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Imaging (what/when/results)</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.imaging} onChange={(e)=>setData({...data, imaging: e.target.value})}/>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1">Comorbidities</label>
+                    <input className="w-full border rounded-xl px-3 py-2" value={data.comorbidities} onChange={(e)=>setData({...data, comorbidities: e.target.value})}/>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 6 && (
+              <div>
+                <SectionHeader title="Goals & Preferences" />
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Goals (what would success look like?)</label>
+                    <textarea rows="3" className="w-full border rounded-xl px-3 py-2" value={data.goals} onChange={(e)=>setData({...data, goals: e.target.value})}/>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {["exercise","manual","education"].map(p => (
+                      <button key={p} onClick={()=>{
+                        const exists = data.prefs.includes(p);
+                        setData({...data, prefs: exists ? data.prefs.filter(x=>x!==p) : [...data.prefs, p]});
+                      }} className={
+                        ["px-3 py-1 rounded-full border",
+                         data.prefs.includes(p)? "bg-black text-white border-black" : "bg-white text-gray-700 border-gray-300"
+                        ].join(" ")
+                      }>{p}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 7 && (
+              <div>
+                <SectionHeader title="Review" subtitle="Preview what your clinician will see"/>
+                <div className="rounded-2xl border p-4 bg-gray-50">
+                  <pre className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</pre>
+                </div>
+                <div className="mt-4 flex items-center gap-3">
+                  <span className={
+                    ["inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm",
+                     triage === "escalate" ? "bg-red-100 text-red-800" : triage === "priority" ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                    ].join(" ")
+                  }>
+                    Triage: {triage.toUpperCase()}
+                  </span>
+                  <span className="text-sm text-gray-500">Internal mock • No backend • UK spelling</span>
+                </div>
+                <div className="mt-4">
+                  <button disabled className="w-full md:w-auto px-4 py-2 rounded-xl bg-gray-200 text-gray-600 cursor-not-allowed">
+                    Export PDF (stub)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between mt-6">
+              <button onClick={()=>setStep(s => Math.max(0, s-1))}
+                      disabled={step===0}
+                      className={"px-4 py-2 rounded-xl border "+(step===0? "border-gray-200 text-gray-300" : "border-gray-300 text-gray-700 hover:bg-gray-50")}>
+                Back
+              </button>
+              <button onClick={()=>setStep(s => Math.min(steps.length-1, s+1))}
+                      disabled={!canNext}
+                      className={"px-4 py-2 rounded-xl text-white "+(!canNext? "bg-gray-300" : "bg-black hover:bg-gray-800")}>
+                {step === steps.length - 1 ? "Finish" : "Next"}
+              </button>
+            </div>
+
+            <div className="mt-4 text-xs text-gray-500 text-right">v0.1 • Internal demo only</div>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
